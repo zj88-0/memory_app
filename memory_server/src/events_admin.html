@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ElderCare — Events Admin</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f4ff; min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 40px 20px; color: #1a1a2e;
+    }
+    header { text-align: center; margin-bottom: 36px; }
+    header .logo {
+      width: 64px; height: 64px;
+      background: linear-gradient(135deg, #6C63FF, #AB47BC);
+      border-radius: 20px; display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 16px; font-size: 32px;
+    }
+    header h1 { font-size: 26px; font-weight: 800; }
+    header p  { font-size: 14px; color: #666; margin-top: 6px; }
+    .card {
+      background: #fff; border-radius: 24px; padding: 32px;
+      width: 100%; max-width: 680px;
+      box-shadow: 0 8px 32px rgba(108,99,255,0.10); margin-bottom: 24px;
+    }
+    .card h2   { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .card .sub { font-size: 13px; color: #888; margin-bottom: 24px; line-height: 1.5; }
+    label { font-size: 13px; font-weight: 600; color: #555; display: block; margin-bottom: 6px; }
+    input[type="text"] {
+      width: 100%; padding: 12px 16px; border: 1.5px solid #e0e0e0;
+      border-radius: 12px; font-size: 14px; outline: none;
+      transition: border 0.2s; margin-bottom: 20px;
+    }
+    input[type="text"]:focus { border-color: #6C63FF; }
+    .btn-row { display: flex; gap: 12px; }
+    .btn {
+      flex: 1; padding: 15px 10px; font-size: 15px; font-weight: 700;
+      border: none; border-radius: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn:hover:not(:disabled)  { opacity: 0.91; transform: translateY(-1px); }
+    .btn:active:not(:disabled) { transform: translateY(0); }
+    .btn:disabled              { opacity: 0.55; cursor: not-allowed; }
+    .btn-add   { background: linear-gradient(135deg,#6C63FF,#AB47BC); color:#fff; box-shadow:0 6px 20px rgba(108,99,255,0.35); }
+    .btn-clear { background: #fff0f0; color: #c62828; border: 1.5px solid #ffcdd2; }
+    .spinner {
+      width:18px; height:18px; border:3px solid rgba(255,255,255,0.4);
+      border-top-color:#fff; border-radius:50%;
+      animation:spin 0.7s linear infinite; display:none;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    #status { margin-top:20px; padding:15px 18px; border-radius:14px; font-size:14px; line-height:1.6; display:none; }
+    #status.success { background:#e8f5e9; border:1.5px solid #a5d6a7; color:#2e7d32; display:block; }
+    #status.error   { background:#fce4ec; border:1.5px solid #f48fb1; color:#c62828; display:block; }
+    #status.info    { background:#e3f2fd; border:1.5px solid #90caf9; color:#1565c0; display:block; }
+    .health-row { display:flex; align-items:center; gap:10px; font-size:13px; color:#888; margin-top:14px; }
+    .dot { width:10px; height:10px; border-radius:50%; background:#ccc; flex-shrink:0; }
+    .dot.green { background:#4caf50; }
+    .dot.red   { background:#f44336; }
+    .dot.pulse { animation:pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .stats-bar { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
+    .stat-chip { background:#f0f4ff; border-radius:20px; padding:6px 14px; font-size:13px; font-weight:600; color:#6C63FF; }
+    .stat-chip span { color:#888; font-weight:400; margin-right:4px; }
+    #events-card { display:none; }
+    .scroll-wrap { overflow-x:auto; border-radius:12px; border:1px solid #f0f0f0; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    thead th { text-align:left; padding:9px 10px; font-weight:700; color:#888; border-bottom:2px solid #f0f0f0; white-space:nowrap; background:#fafafa; }
+    tbody tr { border-bottom:1px solid #f5f5f5; }
+    tbody tr:last-child { border-bottom:none; }
+    tbody tr:hover { background:#fafbff; }
+    tbody td { padding:10px; vertical-align:top; color:#333; }
+    .badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:700; background:#ede7ff; color:#6C63FF; white-space:nowrap; }
+    .badge.today { background:#fff3e0; color:#e65100; }
+    .badge.new   { background:#e8f5e9; color:#2e7d32; }
+    .event-link { color:#6C63FF; text-decoration:none; font-size:11px; }
+    .event-link:hover { text-decoration:underline; }
+    footer { font-size:12px; color:#bbb; margin-top:8px; text-align:center; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🌸</div>
+  <h1>ElderCare Events Admin</h1>
+  <p>Manually add AI-generated Singapore activity events for elderly</p>
+</header>
+
+<div class="card">
+  <h2>Server Configuration</h2>
+  <p class="sub">
+    Each click asks Gemini to generate <strong>5 new events</strong> and appends them to the CSV.
+    Existing events are never deleted — use <em>Clear Past Events</em> to tidy up expired ones.
+  </p>
+
+  <label for="server-url">Server Base URL</label>
+  <input type="text" id="server-url" value="http://localhost:3000" placeholder="http://localhost:3000" />
+
+  <div class="btn-row">
+    <button class="btn btn-add" id="add-btn" onclick="addEvents()">
+      <div class="spinner" id="spinner"></div>
+      <span id="btn-label">✨ Add 5 Events with Gemini AI</span>
+    </button>
+    <button class="btn btn-clear" id="clear-btn" onclick="clearPast()">
+      🗑 Clear Past Events
+    </button>
+  </div>
+
+  <div id="status"></div>
+
+  <div class="health-row">
+    <div class="dot" id="health-dot"></div>
+    <span id="health-label">Server status unknown — click Add Events to check</span>
+  </div>
+</div>
+
+<div class="card" id="events-card">
+  <h2>Upcoming Events in CSV</h2>
+  <div class="stats-bar">
+    <div class="stat-chip"><span>Total upcoming</span><span id="event-count">0</span></div>
+    <div class="stat-chip"><span>Today</span><span id="today-count">0</span></div>
+    <div class="stat-chip" id="lu-chip" style="display:none"><span>Last updated</span><span id="last-updated">—</span></div>
+  </div>
+  <div class="scroll-wrap">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Title</th><th>Category</th><th>Date &amp; Time</th><th>Location</th><th>Link</th></tr>
+      </thead>
+      <tbody id="events-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<footer>ElderCare Admin · Gemini 2.0 Flash · Manual refresh only</footer>
+
+<script>
+  const statusEl = document.getElementById('status');
+  const dotEl    = document.getElementById('health-dot');
+  const healthLb = document.getElementById('health-label');
+  const addBtn   = document.getElementById('add-btn');
+  const spinner  = document.getElementById('spinner');
+  const btnLabel = document.getElementById('btn-label');
+  let   lastAddedStart = -1; // track ids of newly added batch
+
+  function serverUrl() { return document.getElementById('server-url').value.replace(/\/$/, ''); }
+
+  function setStatus(type, html) { statusEl.className = type; statusEl.innerHTML = html; }
+
+  function setLoading(on) {
+    addBtn.disabled = on;
+    document.getElementById('clear-btn').disabled = on;
+    spinner.style.display = on ? 'block' : 'none';
+    btnLabel.textContent  = on ? 'Generating with Gemini…' : '✨ Add 5 Events with Gemini AI';
+  }
+
+  function setHealth(ok) {
+    dotEl.className      = 'dot ' + (ok ? 'green' : 'red');
+    healthLb.textContent = ok ? 'Server is reachable ✓' : 'Server unreachable — is it running?';
+  }
+
+  async function addEvents() {
+    setLoading(true);
+    setStatus('info', '⏳ Asking Gemini to generate 5 new Singapore events…');
+    dotEl.className      = 'dot pulse';
+    healthLb.textContent = 'Connecting…';
+
+    try {
+      const res  = await fetch(`${serverUrl()}/events/refresh`, { method: 'POST' });
+      const data = await res.json();
+      setHealth(true);
+
+      if (res.ok && data.success) {
+        lastAddedStart = (data.count ?? 5) - 5;
+        setStatus('success',
+          `✅ <strong>5 new events added!</strong><br>
+           There are now <strong>${data.count ?? '?'}</strong> upcoming events in the CSV.<br>
+           <small style="color:#555">${data.message ?? ''}</small>`
+        );
+        loadEvents();
+      } else {
+        const isQuota = (data.message ?? '').toLowerCase().includes('quota') ||
+                        (data.message ?? '').toLowerCase().includes('retry');
+        const retryMatch = (data.message ?? '').match(/retry in (\d+)s/i);
+        const retryHint  = retryMatch ? `<br><small>⏱ Gemini says: retry in <strong>${retryMatch[1]}s</strong>.</small>` : '';
+        setStatus('error', isQuota
+          ? `⏳ <strong>Gemini free-tier quota reached.</strong><br>
+             All available models (gemini-1.5-flash-8b, gemini-1.5-flash, gemini-2.0-flash) are exhausted for now.${retryHint}<br>
+             <small>Free limits reset daily. Try again later, or
+             <a href="https://ai.google.dev/gemini-api/docs/rate-limits" target="_blank" rel="noopener">upgrade your plan</a>
+             for higher limits.</small>`
+          : `⚠️ <strong>Could not add events.</strong><br>
+             ${data.message ?? 'Unknown server error.'}<br>
+             <small>Ensure <code>GEMINI_API_KEY</code> is set in your <code>.env</code> file.</small>`
+        );
+      }
+    } catch (err) {
+      setHealth(false);
+      setStatus('error',
+        `❌ <strong>Could not reach server.</strong><br>${err.message}<br>
+         <small>Make sure the Node.js server is running at <code>${serverUrl()}</code></small>`
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function clearPast() {
+    setStatus('info', 'ℹ️ Past events are filtered out automatically by the server at fetch time. The table below already shows only upcoming events.');
+    loadEvents();
+  }
+
+  async function loadEvents() {
+    try {
+      const res    = await fetch(`${serverUrl()}/events`);
+      const events = await res.json();
+      const tbody  = document.getElementById('events-tbody');
+      const card   = document.getElementById('events-card');
+      const today  = new Date().toDateString();
+      let todayN   = 0;
+
+      document.getElementById('event-count').textContent = events.length;
+
+      tbody.innerHTML = events.map((e, i) => {
+        const start   = new Date(e.startTime);
+        const isToday = start.toDateString() === today;
+        if (isToday) todayN++;
+
+        const dateStr = start.toLocaleDateString('en-SG', {
+          day:'numeric', month:'short', weekday:'short', hour:'2-digit', minute:'2-digit'
+        });
+
+        const idNum = parseInt((e.id || '').replace('evt_', ''), 10) || 0;
+        const isNew = idNum > lastAddedStart && lastAddedStart >= 0;
+
+        return `<tr>
+          <td style="color:#bbb;font-size:12px">${i+1}</td>
+          <td>
+            <strong>${esc(e.title)}</strong>
+            ${isToday ? ' <span class="badge today">TODAY</span>' : ''}
+            ${isNew   ? ' <span class="badge new">NEW</span>'   : ''}
+          </td>
+          <td><span class="badge">${esc(e.category)}</span></td>
+          <td style="white-space:nowrap;font-size:12px">${dateStr}</td>
+          <td style="font-size:12px">${esc(e.location)}</td>
+          <td><a class="event-link" href="${esc(e.eventUrl)}" target="_blank" rel="noopener">Open ↗</a></td>
+        </tr>`;
+      }).join('');
+
+      document.getElementById('today-count').textContent = todayN;
+
+      // Try to fetch meta for last-updated timestamp
+      try {
+        const meta = await fetch(`${serverUrl()}/events/meta`).then(r => r.json());
+        if (meta.lastUpdated) {
+          const d = new Date(meta.lastUpdated);
+          document.getElementById('last-updated').textContent =
+            d.toLocaleDateString('en-SG',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+          document.getElementById('lu-chip').style.display = '';
+        }
+      } catch (_) {}
+
+      card.style.display = events.length ? 'block' : 'none';
+    } catch (err) {
+      console.warn('Could not load events:', err.message);
+    }
+  }
+
+  function esc(s) {
+    return String(s ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  window.addEventListener('load', async () => {
+    try {
+      const r = await fetch(`${serverUrl()}/health`);
+      if (r.ok) { setHealth(true); loadEvents(); } else setHealth(false);
+    } catch (_) { setHealth(false); }
+  });
+</script>
+</body>
+</html>

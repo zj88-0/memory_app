@@ -36,6 +36,14 @@ class DataService {
   }
 
   // ─── HELPERS ────────────────────────────────────────────────────────────────
+  String? getRawString(String key) {
+    return _prefs.getString(key);
+  }
+
+  Future<void> setRawString(String key, String value) async {
+    await _prefs.setString(key, value);
+  }
+
   List<Map<String, dynamic>> _readCollection(String key) {
     final raw = _prefs.getString(key);
     if (raw == null) return [];

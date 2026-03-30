@@ -11,7 +11,7 @@ class SttService {
 
   // ── Change this to your server IP/hostname ────────────────────────────────
   //static const String baseUrl = 'http://10.0.2.2:3000'; // Android emulator → localhost
-  static const String baseUrl = 'http://10.101.73.145:3000';
+  static const String baseUrl = 'http://172.17.109.145:3000';
 
   /// Send a WAV/M4A audio file to the server and get back a transcript.
   /// [langCode] is one of: 'en-SG', 'zh-SG', 'ms-MY', 'ta-SG'

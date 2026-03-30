@@ -8,6 +8,7 @@ import '../groups/group_screen.dart';
 import '../settings/settings_screen.dart';
 import '../requests/requests_screen.dart';
 import '../moments/moments_screen.dart';
+import 'events_banner.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -19,8 +20,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  // Fix #1: Only 3 bottom nav items — Home, Quick Actions, Settings
-  // All other screens accessible via home page cards
   final List<Widget> _pages = const [
     _HomePage(),
     QuickActionsScreen(),
@@ -63,8 +62,15 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // ─── Home Page ────────────────────────────────────────────────────────────────
-class _HomePage extends StatelessWidget {
+class _HomePage extends StatefulWidget {
   const _HomePage();
+
+  @override
+  State<_HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<_HomePage> {
+  final bool _interestsBannerKey = false; // used to force rebuild after interest setup
 
   String _greeting(AppLocalizations l10n) {
     final h = DateTime.now().hour;
@@ -88,7 +94,7 @@ class _HomePage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
+              // ── Header ─────────────────────────────────────────────────────
               Row(children: [
                 Container(
                   width: 56, height: 56,
@@ -126,7 +132,12 @@ class _HomePage extends StatelessWidget {
               ]),
               const SizedBox(height: 24),
 
-              // Group card
+              // ── Events Banner (NEW) ────────────────────────────────────────
+              // Only show for elderly users (caregivers manage; elderly enjoy)
+              EventsBanner(key: ValueKey(_interestsBannerKey)),
+              const SizedBox(height: 24),
+
+              // ── Group card ────────────────────────────────────────────────
               if (group == null)
                 _NoGroupCard(l10n: l10n)
               else

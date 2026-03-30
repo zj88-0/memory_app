@@ -4,6 +4,7 @@ import '../../models/user_model.dart';
 import '../../services/auth_provider.dart';
 import '../../utils/app_theme.dart';
 import '../auth/login_screen.dart';
+import '../interests/interest_selection_screen.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -75,7 +76,23 @@ class SettingsScreen extends StatelessWidget {
                 _LanguageSelector(user: user, auth: auth, l10n: l10n),
                 const SizedBox(height: 28),
 
-                // Fix #5: use l10n.account and l10n.editName / l10n.changePassword
+                // ── NEW: Activity Recommendations ─────────────────────────────
+                _SectionHeader(title: l10n.activityRecommendations),
+                const SizedBox(height: 10),
+                _SettingsTile(
+                  icon: Icons.interests_rounded,
+                  label: l10n.editMyInterests,
+                  color: const Color(0xFF7B61FF),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const InterestSelectionScreen(isEditing: true),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 28),
+
+                // Account
                 _SectionHeader(title: l10n.account),
                 const SizedBox(height: 10),
                 _SettingsTile(
@@ -91,7 +108,6 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 28),
 
-                // Fix #5: use l10n.session
                 _SectionHeader(title: l10n.session),
                 const SizedBox(height: 10),
                 _SettingsTile(

@@ -10,7 +10,7 @@ class ApiService {
   ApiService._internal();
 
   //static const String baseUrl = 'http://10.0.2.2:3000';
-  static const String baseUrl = 'http://10.101.73.145:3000';
+  static const String baseUrl = 'http://172.17.109.145:3000';
 
   // ── Moments ──────────────────────────────────────────────────────────────────
 
@@ -40,7 +40,7 @@ class ApiService {
           await request.send().timeout(const Duration(seconds: 30));
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
-      print('Upload Error: $e');
+      // print('Upload Error: $e');
       return false;
     }
   }
