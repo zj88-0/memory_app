@@ -6,6 +6,7 @@ import '../models/quick_action_model.dart';
 import '../models/group_model.dart';
 import '../models/request_model.dart';
 import '../models/moment_model.dart';
+import '../models/safezone_model.dart'; // ← NEW
 
 /// ---------------------------------------------------------------------------
 /// DataService — CRUD layer backed by SharedPreferences.
@@ -20,6 +21,7 @@ class DataService {
   static const String _currentUserKey = 'ec_current_user_id';
   static const String _requestsKey = 'ec_requests';
   static const String _momentsKey = 'ec_moments';
+  // SafeZone keys are per-user: 'ec_safezone:<elderlyId>'
 
   // ─── Singleton ──────────────────────────────────────────────────────────────
   static final DataService _instance = DataService._internal();
@@ -216,7 +218,6 @@ class DataService {
     await _writeCollection(_groupsKey, list);
   }
 
-  /// Add caregiver to group (enforces max 5)
   Future<bool> joinGroup(String groupId, String caregiverId) async {
     final group = await getGroupById(groupId);
     if (group == null) return false;
@@ -291,5 +292,31 @@ class DataService {
     final list = _readCollection(_momentsKey);
     list.removeWhere((m) => m['id'] == id);
     await _writeCollection(_momentsKey, list);
+  }
+
+  // ─── SAFE ZONE ───────────────────────────────────────────────────────────────
+  static String _safeZoneKey(String elderlyId) => 'ec_safezone:$elderlyId';
+
+  /// Load SafeZone settings for a given elderly user. Returns null if never saved.
+  Future<SafeZoneSettings?> getSafeZone(String elderlyId) async {
+    final raw = _prefs.getString(_safeZoneKey(elderlyId));
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final json = jsonDecode(raw) as Map<String, dynamic>;
+      return SafeZoneSettings.fromJson(json);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveSafeZone(SafeZoneSettings settings) async {
+    await _prefs.setString(
+      _safeZoneKey(settings.elderlyId),
+      jsonEncode(settings.toJson()),
+    );
+  }
+
+  Future<void> deleteSafeZone(String elderlyId) async {
+    await _prefs.remove(_safeZoneKey(elderlyId));
   }
 }

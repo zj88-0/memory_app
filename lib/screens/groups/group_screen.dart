@@ -7,6 +7,7 @@ import '../../models/user_model.dart';
 import '../../services/auth_provider.dart';
 import '../../services/data_service.dart';
 import '../../utils/app_theme.dart';
+import 'elderly_management_page.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class GroupScreen extends StatefulWidget {
@@ -101,7 +102,6 @@ class _NoGroupView extends StatelessWidget {
                 elderlyId: user.role == UserRole.elderly ? user.id : '',
                 createdAt: DateTime.now(),
               );
-              // All storage goes through DataService
               await DataService().createGroup(group);
               await DataService().updateUser(user.copyWith(groupId: group.id));
               await auth.refreshGroup();
@@ -201,7 +201,6 @@ class _GroupDetailViewState extends State<_GroupDetailView> {
     }
   }
 
-  // Fix #2: Email-based invite search — reads from DataService, no direct storage
   void _showEmailInviteDialog() {
     final l = widget.l10n;
     final emailCtrl = TextEditingController();
@@ -231,7 +230,6 @@ class _GroupDetailViewState extends State<_GroupDetailView> {
                     onPressed: () async {
                       final email = emailCtrl.text.trim();
                       if (email.isEmpty) return;
-                      // All reads go through DataService
                       final user = await DataService().getUserByEmail(email);
                       if (!ctx.mounted) return;
                       if (user == null) {
@@ -242,7 +240,6 @@ class _GroupDetailViewState extends State<_GroupDetailView> {
                         setDlg(() { foundUser = null; resultMsg = l.alreadyMember; isError = true; });
                         return;
                       }
-                      // Check if already member
                       final alreadyIn = widget.group.memberIds.contains(user.id) ||
                           widget.group.elderlyId == user.id;
                       if (alreadyIn) {
@@ -273,8 +270,7 @@ class _GroupDetailViewState extends State<_GroupDetailView> {
                         color: isError ? AppTheme.error : AppTheme.success, size: 20),
                     const SizedBox(width: 8),
                     Expanded(child: Text(resultMsg!,
-                        style: TextStyle(
-                            fontSize: 14,
+                        style: TextStyle(fontSize: 14,
                             color: isError ? AppTheme.error : AppTheme.success))),
                   ]),
                 ),
@@ -306,7 +302,6 @@ class _GroupDetailViewState extends State<_GroupDetailView> {
                   ]),
                 ),
                 const SizedBox(height: 12),
-                // Show invite code to share
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
@@ -325,8 +320,7 @@ class _GroupDetailViewState extends State<_GroupDetailView> {
                       padding: EdgeInsets.zero, constraints: const BoxConstraints(),
                       icon: const Icon(Icons.copy_rounded, color: AppTheme.success, size: 18),
                       onPressed: () async {
-                        await Clipboard.setData(
-                            ClipboardData(text: widget.group.inviteCode));
+                        await Clipboard.setData(ClipboardData(text: widget.group.inviteCode));
                         if (ctx.mounted) {
                           ScaffoldMessenger.of(ctx).showSnackBar(
                               SnackBar(content: Text(l.copied)));
@@ -365,7 +359,6 @@ class _GroupDetailViewState extends State<_GroupDetailView> {
       ),
     );
     if (confirmed == true) {
-      // All storage through DataService
       await DataService().leaveGroup(widget.group.id, member.id);
       await DataService().updateUser(member.copyWith(groupId: null));
       await widget.auth.refreshGroup();
@@ -373,7 +366,6 @@ class _GroupDetailViewState extends State<_GroupDetailView> {
     }
   }
 
-  // Fix #3: Make admin feature
   Future<void> _makeAdmin(UserModel member) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -390,7 +382,6 @@ class _GroupDetailViewState extends State<_GroupDetailView> {
     );
     if (confirmed == true) {
       final updated = widget.group.copyWith(adminId: member.id);
-      // All storage through DataService
       await DataService().updateGroup(updated);
       await widget.auth.refreshGroup();
       _loadMembers();
@@ -480,8 +471,6 @@ class _GroupDetailViewState extends State<_GroupDetailView> {
                       onPressed: _renameGroup),
               ]),
               const SizedBox(height: 14),
-
-              // Fix #1: invite code row — wrap tightly, use Flexible to prevent overflow
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
@@ -490,7 +479,6 @@ class _GroupDetailViewState extends State<_GroupDetailView> {
                 child: Row(children: [
                   const Icon(Icons.vpn_key_rounded, color: Colors.white, size: 18),
                   const SizedBox(width: 6),
-                  // Fix #1: l10n key for "Code", then flexible code value
                   Flexible(
                     child: Text(
                       '${l.inviteCodeLabel}: ',
@@ -503,12 +491,10 @@ class _GroupDetailViewState extends State<_GroupDetailView> {
                           color: Colors.white, fontSize: 16,
                           fontWeight: FontWeight.w800, letterSpacing: 2)),
                   const SizedBox(width: 4),
-                  // Copy button
                   GestureDetector(
                     onTap: _copyCode,
                     child: const Icon(Icons.copy_rounded, color: Colors.white, size: 18),
                   ),
-                  // Fix #2: Email invite button
                   if (isAdmin) ...[
                     const SizedBox(width: 6),
                     GestureDetector(
@@ -519,7 +505,6 @@ class _GroupDetailViewState extends State<_GroupDetailView> {
                 ]),
               ),
               const SizedBox(height: 8),
-              // Fix #5: use l10n.caregiverCount instead of hardcoded "caregivers"
               Text(
                 '${_members.length}/${CareGroup.maxCaregivers} ${l.caregiverCount}',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
@@ -528,7 +513,6 @@ class _GroupDetailViewState extends State<_GroupDetailView> {
           ),
           const SizedBox(height: 20),
 
-          // Fix #2: Invite buttons row (visible to admin only)
           if (isAdmin) ...[
             Row(children: [
               Expanded(
@@ -558,19 +542,17 @@ class _GroupDetailViewState extends State<_GroupDetailView> {
             const SizedBox(height: 20),
           ],
 
-          // Elderly member
+          // Elderly member — tappable for admin caregivers
           if (_elderly != null) ...[
             Text(l.roleElderly, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
-            _MemberTile(
-              user: _elderly!, isAdmin: false, isElderly: true,
-              showRemove: false, showMakeAdmin: false, showChangeAdmin: false,
-              onRemove: () {}, onMakeAdmin: () {}, onChangeAdmin: () {},
+            _ElderlyCard(
+              elderly: _elderly!,
+              isAdminCaregiver: isAdmin && widget.auth.isCaregiver,
             ),
             const SizedBox(height: 24),
           ],
 
-          // Caregiver members
           Row(children: [
             Text(l.members, style: Theme.of(context).textTheme.titleLarge),
             const Spacer(),
@@ -586,7 +568,6 @@ class _GroupDetailViewState extends State<_GroupDetailView> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: const Color(0xFFE0E0E0))),
-              // Fix #5: use l10n key
               child: Center(child: Text(l.noCaregivers,
                   style: const TextStyle(fontSize: 15, color: AppTheme.textSecondary))),
             )
@@ -597,12 +578,8 @@ class _GroupDetailViewState extends State<_GroupDetailView> {
                 user: m,
                 isAdmin: m.id == widget.group.adminId,
                 isElderly: false,
-                // Current admin can remove anyone except themselves
                 showRemove: isAdmin && m.id != widget.auth.currentUser?.id,
-                // Show makeAdmin for non-admin members (when current user is admin)
                 showMakeAdmin: isAdmin && m.id != widget.group.adminId,
-                // Show changeAdmin (transfer) button on the CURRENT admin tile
-                // so admin can hand off to someone else
                 showChangeAdmin: isAdmin && m.id == widget.group.adminId && m.id != widget.auth.currentUser?.id,
                 onRemove: () => _removeMember(m),
                 onMakeAdmin: () => _makeAdmin(m),
@@ -627,6 +604,73 @@ class _GroupDetailViewState extends State<_GroupDetailView> {
   }
 }
 
+// ── Elderly card — tappable for admin caregivers ──────────────────────────────
+class _ElderlyCard extends StatelessWidget {
+  final UserModel elderly;
+  final bool isAdminCaregiver;
+  const _ElderlyCard({required this.elderly, required this.isAdminCaregiver});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return GestureDetector(
+      onTap: isAdminCaregiver
+          ? () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ElderlyManagementPage(elderly: elderly),
+                ),
+              )
+          : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.accent.withOpacity(0.4)),
+          boxShadow: [BoxShadow(
+              color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+        ),
+        child: Row(children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: AppTheme.accent.withOpacity(0.15),
+            child: Text(
+              elderly.name.isNotEmpty ? elderly.name[0].toUpperCase() : '?',
+              style: const TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.w700, color: AppTheme.accent),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(elderly.name,
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                overflow: TextOverflow.ellipsis),
+            Text(elderly.email,
+                style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                overflow: TextOverflow.ellipsis),
+          ])),
+          if (isAdminCaregiver) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                  color: AppTheme.accent.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20)),
+              child: Text(l10n.manage,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700,
+                      color: AppTheme.accent)),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.arrow_forward_ios_rounded,
+                color: AppTheme.accent, size: 16),
+          ],
+        ]),
+      ),
+    );
+  }
+}
+
 class _MemberTile extends StatelessWidget {
   final UserModel user;
   final bool isAdmin;
@@ -638,15 +682,10 @@ class _MemberTile extends StatelessWidget {
   final bool showChangeAdmin;
   final VoidCallback onChangeAdmin;
   const _MemberTile({
-    required this.user,
-    required this.isAdmin,
-    required this.isElderly,
-    required this.showRemove,
-    required this.showMakeAdmin,
-    required this.showChangeAdmin,
-    required this.onRemove,
-    required this.onMakeAdmin,
-    required this.onChangeAdmin,
+    required this.user, required this.isAdmin, required this.isElderly,
+    required this.showRemove, required this.showMakeAdmin,
+    required this.showChangeAdmin, required this.onRemove,
+    required this.onMakeAdmin, required this.onChangeAdmin,
   });
 
   @override
@@ -700,7 +739,6 @@ class _MemberTile extends StatelessWidget {
             tooltip: l10n.makeAdmin,
             onPressed: onMakeAdmin,
           ),
-        // Change admin: transfer admin role FROM this admin tile TO someone else
         if (showChangeAdmin)
           IconButton(
             icon: const Icon(Icons.swap_horiz_rounded, color: AppTheme.accent, size: 26),

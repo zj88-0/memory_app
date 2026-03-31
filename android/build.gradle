@@ -4,18 +4,50 @@ buildscript {
         google()
         mavenCentral()
     }
-
     dependencies {
-        // This line tells Android which version of the Gradle tools to use
         classpath 'com.android.tools.build:gradle:8.1.0'
-        // This line tells Android which version of Kotlin to use
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
+
 allprojects {
     repositories {
         google()
         mavenCentral()
+        maven { url 'https://storage.googleapis.com/download.flutter.io' }
+    }
+}
+
+// THIS BLOCK FIXES GEOLOCATOR WITHOUT BREAKING THE APP
+subprojects {
+    if (project.name != 'app') {
+        ext.flutter = [
+            compileSdkVersion: 35,
+            minSdkVersion: 24,
+            targetSdkVersion: 35
+        ]
+    }
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            // Force Kotlin stdlib version to avoid metadata 2.2.0 mismatch errors
+             project.configurations.configureEach {
+                 resolutionStrategy.eachDependency { details ->
+                     if (details.requested.group == 'org.jetbrains.kotlin' && details.requested.name.startsWith('kotlin-stdlib')) {
+                         details.useVersion '1.9.22'
+                     }
+                 }
+             }
+             project.android {
+                // Fixes namespace issues for older plugins
+                if (namespace == null) {
+                    namespace project.group
+                }
+                // Specifically tells geolocator to use API 35/36
+                if (project.name.contains('geolocator_android')) {
+                    compileSdkVersion 35
+                }
+            }
+        }
     }
 }
 

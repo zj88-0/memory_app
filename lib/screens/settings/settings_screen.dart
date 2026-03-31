@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import '../../models/user_model.dart';
+import '../../models/safezone_model.dart';
 import '../../services/auth_provider.dart';
+import '../../services/data_service.dart';
+import '../../services/safezone_service.dart';
 import '../../utils/app_theme.dart';
 import '../auth/login_screen.dart';
 import '../interests/interest_selection_screen.dart';
@@ -76,7 +80,7 @@ class SettingsScreen extends StatelessWidget {
                 _LanguageSelector(user: user, auth: auth, l10n: l10n),
                 const SizedBox(height: 28),
 
-                // ── NEW: Activity Recommendations ─────────────────────────────
+                // Activity Recommendations
                 _SectionHeader(title: l10n.activityRecommendations),
                 const SizedBox(height: 10),
                 _SettingsTile(
@@ -91,6 +95,16 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 28),
+
+                // ── Safe Zone (elderly only) ──────────────────────────────────
+                if (user.role == UserRole.elderly) ...[
+                  _SectionHeader(title: l10n.safeZone),
+                  const SizedBox(height: 10),
+                  _SetHomeTile(user: user, l10n: l10n),
+                  const SizedBox(height: 10),
+                  _TestAlarmTile(user: user, l10n: l10n),
+                  const SizedBox(height: 28),
+                ],
 
                 // Account
                 _SectionHeader(title: l10n.account),
@@ -130,6 +144,7 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     );
                     if (confirmed == true && context.mounted) {
+                      SafeZoneService().stop();
                       await auth.logout();
                       if (!context.mounted) return;
                       Navigator.of(context).pushAndRemoveUntil(
@@ -222,6 +237,260 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 }
+
+// ── Set Home tile — visible ONLY to elderly ──────────────────────────────────
+class _SetHomeTile extends StatefulWidget {
+  final UserModel user;
+  final AppLocalizations l10n;
+  const _SetHomeTile({required this.user, required this.l10n});
+
+  @override
+  State<_SetHomeTile> createState() => _SetHomeTileState();
+}
+
+class _SetHomeTileState extends State<_SetHomeTile> {
+  bool _loading = false;
+  SafeZoneSettings? _settings;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final s = await DataService().getSafeZone(widget.user.id);
+    if (mounted) setState(() => _settings = s);
+  }
+
+  Future<void> _setHome() async {
+    setState(() => _loading = true);
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _snack(widget.l10n.locationServiceDisabled);
+        return;
+      }
+      LocationPermission perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+        if (perm == LocationPermission.denied) {
+          _snack(widget.l10n.locationPermissionDenied);
+          return;
+        }
+      }
+      if (perm == LocationPermission.deniedForever) {
+        _snack(widget.l10n.locationPermissionDenied);
+        return;
+      }
+
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+
+      final existing = await DataService().getSafeZone(widget.user.id);
+      final updated = (existing ?? SafeZoneSettings(elderlyId: widget.user.id))
+          .copyWith(homeLat: pos.latitude, homeLng: pos.longitude);
+      await DataService().saveSafeZone(updated);
+      if (mounted) {
+        setState(() => _settings = updated);
+        _snack(widget.l10n.homeLocationSaved);
+      }
+    } catch (e) {
+      _snack(widget.l10n.locationError);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = widget.l10n;
+    final hasHome = _settings?.hasHome ?? false;
+
+    return GestureDetector(
+      onTap: _loading ? null : _setHome,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE0E0E0)),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 2))],
+        ),
+        child: Row(children: [
+          _loading
+              ? const SizedBox(width: 26, height: 26,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : Icon(Icons.location_on_rounded,
+                  color: hasHome ? AppTheme.success : AppTheme.textPrimary, size: 26),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(l10n.setHomeLocation,
+                  style: TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w600,
+                      color: hasHome ? AppTheme.success : AppTheme.textPrimary)),
+              if (hasHome)
+                Text(
+                  '${_settings!.homeLat!.toStringAsFixed(5)}, '
+                  '${_settings!.homeLng!.toStringAsFixed(5)}',
+                  style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                )
+              else
+                Text(l10n.setHomeLocationDesc,
+                    style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+            ]),
+          ),
+          Icon(Icons.arrow_forward_ios_rounded,
+              color: AppTheme.textPrimary.withOpacity(0.4), size: 16),
+        ]),
+      ),
+    );
+  }
+}
+
+// ── Test alarm tile — simulates a 500 m breach to trigger the full alert flow ─
+class _TestAlarmTile extends StatefulWidget {
+  final UserModel user;
+  final AppLocalizations l10n;
+  const _TestAlarmTile({required this.user, required this.l10n});
+
+  @override
+  State<_TestAlarmTile> createState() => _TestAlarmTileState();
+}
+
+class _TestAlarmTileState extends State<_TestAlarmTile> {
+  bool _triggering = false;
+
+  Future<void> _triggerTest() async {
+    final l10n = widget.l10n;
+
+    // Confirm before firing so the elderly doesn't tap it by accident.
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(children: [
+          const Icon(Icons.warning_amber_rounded, color: AppTheme.warning, size: 28),
+          const SizedBox(width: 10),
+          Text(l10n.testAlarmTitle,
+              style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
+        ]),
+        content: Text(l10n.testAlarmDesc,
+            style: const TextStyle(fontSize: 15, height: 1.5)),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.cancel)),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.warning),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.testAlarmConfirm,
+                style: const TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _triggering = true);
+
+    // Load current settings.
+    final existing = await DataService().getSafeZone(widget.user.id);
+    if (existing == null || !existing.hasHome) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.safeZoneNoHomeYet)),
+        );
+        setState(() => _triggering = false);
+      }
+      return;
+    }
+
+    // Temporarily set radius to 0 so current position is always "outside"
+    // and force isAbnormalTime by saving a sleep window that covers NOW,
+    // then restore everything after the check fires.
+    final now = DateTime.now();
+    final testStart = (now.hour - 1 + 24) % 24;
+    final testEnd = (now.hour + 2) % 24;
+
+    final testSettings = existing.copyWith(
+      enabled: true,
+      radiusMeters: 0,           // any distance triggers the alarm
+      sleepStartHour: testStart, // window covers the current hour
+      sleepEndHour: testEnd,
+      awaitingConfirmation: false,
+    );
+    await DataService().saveSafeZone(testSettings);
+
+    // Force an immediate check — the service will detect a breach and fire.
+    await SafeZoneService().triggerTestCheck(widget.user.id);
+
+    // Restore original settings after a short delay so the real monitoring
+    // is not permanently affected.
+    await Future.delayed(const Duration(seconds: 3));
+    await DataService().saveSafeZone(existing.copyWith(awaitingConfirmation: false));
+
+    if (mounted) {
+      setState(() => _triggering = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.testAlarmTriggered)),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = widget.l10n;
+    return GestureDetector(
+      onTap: _triggering ? null : _triggerTest,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.warning.withOpacity(0.4)),
+          boxShadow: [BoxShadow(
+              color: Colors.black.withOpacity(0.03), blurRadius: 6,
+              offset: const Offset(0, 2))],
+        ),
+        child: Row(children: [
+          _triggering
+              ? const SizedBox(width: 26, height: 26,
+                  child: CircularProgressIndicator(strokeWidth: 2,
+                      color: AppTheme.warning))
+              : const Icon(Icons.notifications_active_rounded,
+                  color: AppTheme.warning, size: 26),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+              Text(l10n.testAlarmButton,
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w600,
+                      color: AppTheme.warning)),
+              Text(l10n.testAlarmSubtitle,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppTheme.textSecondary)),
+            ]),
+          ),
+          Icon(Icons.arrow_forward_ios_rounded,
+              color: AppTheme.warning.withOpacity(0.5), size: 16),
+        ]),
+      ),
+    );
+  }
+}
+
+// ─── Reused sub-widgets ───────────────────────────────────────────────────────
 
 class _LanguageSelector extends StatelessWidget {
   final UserModel user;
