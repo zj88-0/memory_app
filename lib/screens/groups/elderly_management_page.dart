@@ -4,6 +4,7 @@ import '../../models/safezone_model.dart';
 import '../../services/data_service.dart';
 import '../../services/safezone_service.dart';
 import '../../utils/app_theme.dart';
+import '../interests/interest_selection_screen.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 /// Opened when an admin caregiver taps the elderly member card in the group screen.
@@ -143,10 +144,14 @@ class _ElderlyManagementPageState extends State<ElderlyManagementPage> {
                   icon: Icons.interests_rounded,
                   label: l10n.editElderlyInterests,
                   color: const Color(0xFF7B61FF),
-                  onTap: () => Navigator.pushNamed(
+                  onTap: () => Navigator.push(
                     context,
-                    '/interests',
-                    arguments: widget.elderly.id,
+                    MaterialPageRoute(
+                      builder: (_) => InterestSelectionScreen(
+                        isEditing: true,
+                        elderlyId: widget.elderly.id,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 28),

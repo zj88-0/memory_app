@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "925405520869",
+    "project_id": "memoryapp-a008e",
+    "storage_bucket": "memoryapp-a008e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:925405520869:android:c2128798eea7385c78050c",
+        "android_client_info": {
+          "package_name": "com.example.memory_task_v2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAwsOymPb9yeJ1en5NSIWDIfIPYzKUjSmM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

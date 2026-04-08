@@ -17,6 +17,13 @@ class CareGroup {
     required this.createdAt,
   });
 
+  /// The invite code is the first 8 characters of the group id (uppercase).
+  /// It is also stored as a top-level Firestore field ('inviteCode') so that
+  /// DataService can query groups by invite code without a full collection scan.
+  String get inviteCode => id.substring(0, 8).toUpperCase();
+
+  bool get isFull => memberIds.length >= maxCaregivers;
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
@@ -24,21 +31,18 @@ class CareGroup {
         'memberIds': memberIds,
         'elderlyId': elderlyId,
         'createdAt': createdAt.toIso8601String(),
+        // Stored explicitly so Firestore can index and query it.
+        'inviteCode': inviteCode,
       };
 
   factory CareGroup.fromJson(Map<String, dynamic> json) => CareGroup(
-        id: json['id'],
-        name: json['name'],
-        adminId: json['adminId'],
+        id: json['id'] as String,
+        name: json['name'] as String,
+        adminId: json['adminId'] as String,
         memberIds: List<String>.from(json['memberIds'] ?? []),
-        elderlyId: json['elderlyId'],
-        createdAt: DateTime.parse(json['createdAt']),
+        elderlyId: json['elderlyId'] as String,
+        createdAt: DateTime.parse(json['createdAt'] as String),
       );
-
-  // Invite code is just group id for local storage
-  String get inviteCode => id.substring(0, 8).toUpperCase();
-
-  bool get isFull => memberIds.length >= maxCaregivers;
 
   CareGroup copyWith({
     String? name,

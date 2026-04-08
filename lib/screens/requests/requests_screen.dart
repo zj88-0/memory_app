@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/request_model.dart';
@@ -20,25 +21,34 @@ class _RequestsScreenState extends State<RequestsScreen>
   bool _loading = true;
   late TabController _tabs;
 
+  StreamSubscription<List<ActionRequest>>? _sub;
+
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 3, vsync: this);
-    _load();
+    _listen();
   }
 
   @override
   void dispose() {
+    _sub?.cancel();
     _tabs.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
+  void _listen() {
     final auth = context.read<AuthProvider>();
     final gid = auth.currentGroup?.id;
     if (gid == null) { setState(() => _loading = false); return; }
-    final reqs = await DataService().getRequestsByGroup(gid);
-    if (mounted) setState(() { _all = reqs; _loading = false; });
+    _sub?.cancel();
+    _sub = DataService().streamRequestsByGroup(gid).listen((reqs) {
+      if (mounted) setState(() { _all = reqs; _loading = false; });
+    });
+  }
+
+  Future<void> _load() async {
+    _listen();
   }
 
   List<ActionRequest> get _pending  => _all.where((r) => r.status == RequestStatus.pending).toList();

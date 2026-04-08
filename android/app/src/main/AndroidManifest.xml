@@ -1,20 +1,40 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-    <uses-permission android:name="android.permission.VIBRATE"/>
+    <!-- ── Notifications ─────────────────────────────────────────────── -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <!-- ── Exact / scheduled alarms (flutter_local_notifications) ──── -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+    <!-- ── Boot (reschedule alarms after reboot) ────────────────────── -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- ── Network ──────────────────────────────────────────────────── -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- ── Wake lock (keep CPU awake while processing FCM) ──────────── -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- ── Foreground service (location + background listener) ──────── -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <!-- Needed for audio playback in foreground alarm service (Android 14+) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+    <!-- Battery optimization exclusion — lets exact alarms fire even in deep Doze -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+
+    <!-- ── Camera / Storage ─────────────────────────────────────────── -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
-    <!--  Microphone (STT voice recording)  -->
+    <!-- ── Audio ─────────────────────────────────────────────────────── -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- ── Location ──────────────────────────────────────────────────── -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
     <queries>
         <intent>
             <action android:name="android.intent.action.VIEW"/>
@@ -25,24 +45,21 @@
             <data android:scheme="http"/>
         </intent>
     </queries>
+
     <application
         android:label="memory_task_v2"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
-            <!-- Specifies an Android theme to apply to this Activity as soon as
-                 the Android process has started. This theme is visible to the user
-                 while the Flutter UI initializes. After that, this theme continues
-                 to determine the Window background behind the Flutter UI. -->
             <meta-data
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
@@ -52,6 +69,28 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <!-- ── FCM: FirebaseMessagingService ─────────────────────────── -->
+        <!-- Handles push messages in background / terminated state      -->
+        <service
+            android:name="com.google.firebase.messaging.FirebaseMessagingService"
+            android:exported="false">
+            <intent-filter android:priority="1">
+                <action android:name="com.google.firebase.MESSAGING_EVENT"/>
+            </intent-filter>
+        </service>
+
+        <!-- ── FCM: default notification channel (Android 8+) ────────── -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="eldercare_high_priority"/>
+
+        <!-- ── FCM: default notification icon ────────────────────────── -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher"/>
+
+        <!-- ── flutter_local_notifications: scheduled alarms ─────────── -->
         <receiver android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" android:exported="false"/>
         <receiver android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver" android:exported="false">
             <intent-filter>
@@ -61,12 +100,61 @@
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
             </intent-filter>
         </receiver>
+
+        <!-- ── android_alarm_manager_plus ────────────────────────────── -->
+        <!-- foregroundServiceType required on Android 14+ -->
+        <service
+            android:name="dev.fluttercommunity.plus.androidalarm.AlarmService"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false"
+            android:foregroundServiceType="dataSync|mediaPlayback"/>
+        <receiver
+            android:name="dev.fluttercommunity.plus.androidalarm.AlarmBroadcastReceiver"
+            android:exported="false"/>
+        <receiver
+            android:name="dev.fluttercommunity.plus.androidalarm.RebootBroadcastReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
+
+        <!-- ── Native AlarmReceiver (setAlarmClock path) ─────────────────── -->
+        <!-- On Android 14+ (API 34), AlarmManager requires receivers used    -->
+        <!-- by setAlarmClock / setExactAndAllowWhileIdle to be exported.     -->
+        <receiver
+            android:name=".AlarmReceiver"
+            android:exported="true"/>
+
+        <!-- ── BootReceiver — reschedules native alarms after reboot ──────── -->
+        <!-- Android clears all AlarmManager alarms on device shutdown.       -->
+        <!-- This receiver fires on boot and re-schedules every alarm whose   -->
+        <!-- data was persisted to SharedPreferences by AlarmService.         -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+
+        <!-- ── AlarmForegroundService — plays ringtone + shows full-screen ── -->
+        <!-- notification while app is killed.  foregroundServiceType must    -->
+        <!-- include the use-case matching the FOREGROUND_SERVICE_* permission -->
+        <service
+            android:name=".AlarmForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback"/>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
+
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
          https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.

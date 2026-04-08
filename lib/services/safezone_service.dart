@@ -20,6 +20,9 @@ class SafeZoneService {
   String? _currentElderlyId;
   String? get currentElderlyId => _currentElderlyId;
   bool _running = false;
+  // In-memory flag: true while waiting for the elderly's "I'm OK" response.
+  // Avoids a Firestore read every 30 s when we already know confirmation is pending.
+  bool _awaitingConfirmation = false;
 
   void Function()? _inAppCallback;
   void setInAppCheckCallback(void Function()? cb) => _inAppCallback = cb;
@@ -41,12 +44,14 @@ class SafeZoneService {
     _confirmTimer = null;
     _running = false;
     _currentElderlyId = null;
+    _awaitingConfirmation = false;
     debugPrint('[SafeZone] monitoring stopped');
   }
 
   Future<void> confirmSafe() async {
     _confirmTimer?.cancel();
     _confirmTimer = null;
+    _awaitingConfirmation = false;   // clear in-memory flag immediately
     final id = _currentElderlyId;
     if (id == null) return;
     final settings = await DataService().getSafeZone(id);
@@ -60,23 +65,33 @@ class SafeZoneService {
   /// Forces an immediate breach check regardless of the polling timer.
   Future<void> triggerTestCheck(String elderlyId) async {
     _currentElderlyId = elderlyId;
+    _awaitingConfirmation = false;
     await _checkOnce();
   }
 
   Future<void> _checkOnce() async {
     final id = _currentElderlyId;
     if (id == null) return;
+    // Fast in-memory guard — skip the Firestore read entirely while we are
+    // already waiting for the elderly to confirm.  Saves 1 read every 30 s
+    // during the 2-minute confirmation window.
+    if (_awaitingConfirmation) return;
     final settings = await DataService().getSafeZone(id);
     if (settings == null || !settings.enabled || !settings.hasHome) return;
-    if (settings.awaitingConfirmation) return;
+    if (settings.awaitingConfirmation) {
+      _awaitingConfirmation = true; // sync in-memory with persisted state
+      return;
+    }
     if (!settings.isAbnormalTime) return;
 
     final Position? pos = await _getPosition();
-    if (pos == null) return;
+    if (pos == null && settings.radiusMeters != -1) return;
 
-    final distanceM = _haversineMeters(
-      pos.latitude, pos.longitude, settings.homeLat!, settings.homeLng!,
-    );
+    final distanceM = pos == null
+        ? 99999.0 // Guaranteed to be > -1
+        : _haversineMeters(
+            pos.latitude, pos.longitude, settings.homeLat!, settings.homeLng!,
+          );
     debugPrint('[SafeZone] dist=${distanceM.toStringAsFixed(1)}m radius=${settings.radiusMeters}m');
 
     if (distanceM > settings.radiusMeters) {
@@ -85,6 +100,7 @@ class SafeZoneService {
   }
 
   Future<void> _triggerElderlyCheck(SafeZoneSettings settings) async {
+    _awaitingConfirmation = true;  // set in-memory immediately — no more Firestore reads until resolved
     await DataService().saveSafeZone(settings.copyWith(awaitingConfirmation: true));
     _inAppCallback?.call();
     await NotificationService().showElderlyCheckNotification();
@@ -114,10 +130,16 @@ class SafeZoneService {
         if (perm == LocationPermission.denied) return null;
       }
       if (perm == LocationPermission.deniedForever) return null;
-      return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
-      );
+      Position? pos;
+      try {
+        pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 8),
+        );
+      } catch (_) {
+        pos = await Geolocator.getLastKnownPosition();
+      }
+      return pos;
     } catch (e) {
       debugPrint('[SafeZone] location error: $e');
       return null;

@@ -13,7 +13,7 @@ import 'package:memory_task_v2/main.dart';
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const ElderCareApp());
+    await tester.pumpWidget(ElderCareApp(navigatorKey: GlobalKey<NavigatorState>()));
 
     // Verify that our counter starts at 0.
     expect(find.text('0'), findsOneWidget);

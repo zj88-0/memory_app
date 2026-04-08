@@ -9,7 +9,6 @@ import '../../models/quick_action_model.dart';
 import '../../models/request_model.dart';
 import '../../services/auth_provider.dart';
 import '../../services/data_service.dart';
-import '../../services/notification_service.dart';
 import '../../services/stt_service.dart';
 import '../../services/tts_service.dart';
 import '../../utils/app_theme.dart';
@@ -127,12 +126,22 @@ class _QuickActionsScreenState extends State<QuickActionsScreen> {
     );
     await DataService().createRequest(req);
 
-    await NotificationService().showCaregiverAlert(
-      title: '🔔 ${user.name} ${l10n.requestFrom}',
-      body: details != null && details.isNotEmpty
-          ? '${btn.label}: $details'
-          : btn.label,
-    );
+    // Notify all caregivers in the group — this works even when their app
+    // is closed, as the notification document is picked up by their device's
+    // Firestore stream listener (or FCM when fully killed).
+    final group = auth.currentGroup!;
+    final notifTitle = '🔔 ${user.name} ${l10n.requestFrom}';
+    final notifBody  = details != null && details.isNotEmpty
+        ? '${btn.label}: $details'
+        : btn.label;
+    for (final memberId in group.memberIds) {
+      await DataService().sendNotificationDocument(
+        targetUserId: memberId,
+        title: notifTitle,
+        body: notifBody,
+        channel: 'eldercare_caregiver',
+      );
+    }
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(

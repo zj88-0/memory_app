@@ -52,7 +52,13 @@ const Map<String, Color> kCategoryColors = {
 class InterestSelectionScreen extends StatefulWidget {
   /// If true, shown as a settings sub-page (not onboarding)
   final bool isEditing;
-  const InterestSelectionScreen({super.key, this.isEditing = false});
+  /// If provided, edits interests for the specified user instead of the current user.
+  final String? elderlyId;
+  const InterestSelectionScreen({
+    super.key,
+    this.isEditing = false,
+    this.elderlyId,
+  });
 
   @override
   State<InterestSelectionScreen> createState() => _InterestSelectionScreenState();
@@ -71,9 +77,9 @@ class _InterestSelectionScreenState extends State<InterestSelectionScreen> {
 
   Future<void> _loadExisting() async {
     final auth = context.read<AuthProvider>();
-    final userId = auth.currentUser?.id ?? '';
-    if (userId.isNotEmpty) {
-      final existing = await EventService().getUserInterests(userId);
+    final targetId = widget.elderlyId ?? auth.currentUser?.id ?? '';
+    if (targetId.isNotEmpty) {
+      final existing = await EventService().getUserInterests(targetId);
       setState(() {
         _selected.addAll(existing);
         _loading = false;
@@ -118,8 +124,8 @@ class _InterestSelectionScreenState extends State<InterestSelectionScreen> {
     }
     setState(() => _saving = true);
     final auth = context.read<AuthProvider>();
-    final userId = auth.currentUser?.id ?? '';
-    await EventService().saveUserInterests(userId, _selected.toList());
+    final targetId = widget.elderlyId ?? auth.currentUser?.id ?? '';
+    await EventService().saveUserInterests(targetId, _selected.toList());
     setState(() => _saving = false);
     if (mounted) {
       if (widget.isEditing) {

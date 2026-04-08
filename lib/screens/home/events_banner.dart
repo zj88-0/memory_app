@@ -61,7 +61,7 @@ class _EventsBannerState extends State<EventsBanner> {
   Future<void> _loadEvents() async {
     final auth = context.read<AuthProvider>();
     final userId = auth.currentUser?.id ?? '';
-    final hasInterests = EventService().hasSetInterests(userId);
+    final hasInterests = await EventService().hasSetInterests(userId);
 
     setState(() => _hasInterests = hasInterests);
 

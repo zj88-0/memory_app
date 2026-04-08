@@ -10,7 +10,7 @@ class ApiService {
   ApiService._internal();
 
   //static const String baseUrl = 'http://10.0.2.2:3000';
-  static const String baseUrl = 'http://172.17.109.145:3000';
+  static const String baseUrl = 'http://10.146.67.145:3000';
 
   // ── Moments ──────────────────────────────────────────────────────────────────
 

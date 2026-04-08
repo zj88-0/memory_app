@@ -26,27 +26,18 @@ class EventService {
 
   static const String _eventsKey      = 'ec_events_cache';
   static const String _eventsCacheTs  = 'ec_events_cache_ts';
-  static const String _interestsKey   = 'ec_user_interests_';  // suffix with userId
 
-  // ── Interest CRUD (stored via DataService → SharedPreferences) ─────────────
+  // ── Interest CRUD (stored via DataService → Firestore / SharedPreferences) ───
   Future<List<String>> getUserInterests(String userId) async {
-    final raw = DataService().getRawString('$_interestsKey$userId');
-    if (raw == null) return [];
-    try {
-      final list = jsonDecode(raw) as List;
-      return list.cast<String>();
-    } catch (_) {
-      return [];
-    }
+    return await DataService().getUserInterests(userId);
   }
 
   Future<void> saveUserInterests(String userId, List<String> categories) async {
-    await DataService().setRawString(
-        '$_interestsKey$userId', jsonEncode(categories));
+    await DataService().saveUserInterests(userId, categories);
   }
 
-  bool hasSetInterests(String userId) {
-    return DataService().getRawString('$_interestsKey$userId') != null;
+  Future<bool> hasSetInterests(String userId) async {
+    return await DataService().hasSetInterests(userId);
   }
 
   // ── Event fetching with local cache (TTL: 1 hour) ─────────────────────────
